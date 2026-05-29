@@ -1,0 +1,361 @@
+:root {
+    --lilac-light: #e9d5ff;
+    --lilac-medium: #c084fc;
+    --lilac-dark: #7e22ce;
+    --night-bg: #080c1d;
+    --glass-bg: rgba(8, 12, 29, 0.4);
+    --glass-border: rgba(233, 213, 255, 0.15);
+    --text-color: #f3e8ff;
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    user-select: none;
+}
+
+body {
+    background-color: var(--night-bg);
+    color: var(--text-color);
+    font-family: 'Outfit', sans-serif;
+    overflow: hidden;
+    width: 100vw;
+    height: 100vh;
+    /* Custom Heart Cursor */
+    cursor: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='28' height='28' viewBox='0 0 24 24' fill='%23c084fc'><path d='M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z'/></svg>") 14 14, auto;
+}
+
+/* Ambient Night Gradient Background */
+#bg-gradient {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: radial-gradient(circle at center, #111a3a 0%, #080c1d 60%, #03040a 100%);
+    z-index: -2;
+}
+
+/* Canvas styling */
+#canvas-container {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 1;
+}
+
+canvas {
+    width: 100%;
+    height: 100%;
+    display: block;
+}
+
+/* Glassmorphism UI Overlays */
+.ui-container {
+    position: absolute;
+    z-index: 10;
+    pointer-events: none;
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    height: 100%;
+    padding: 2.5rem;
+    justify-content: space-between;
+}
+
+header {
+    pointer-events: auto;
+    max-width: 500px;
+    animation: fadeInDown 1s ease-out;
+}
+
+h1 {
+    font-family: 'Playfair Display', serif;
+    font-size: 2.5rem;
+    font-weight: 700;
+    line-height: 1.2;
+    background: linear-gradient(135deg, #ffffff 30%, #e9d5ff 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    text-shadow: 0 4px 20px rgba(192, 132, 252, 0.25);
+    margin-bottom: 0.5rem;
+}
+
+.subtitle {
+    font-size: 0.95rem;
+    color: #c084fc;
+    font-weight: 300;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+}
+
+.music-control {
+    position: absolute;
+    top: 7rem;
+    right: 2.5rem;
+    z-index: 12;
+    pointer-events: auto;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: rgba(8, 12, 29, 0.6);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid var(--glass-border);
+    padding: 0.6rem 1.2rem;
+    border-radius: 50px;
+    font-size: 0.78rem;
+    font-weight: 500;
+    letter-spacing: 1px;
+    color: #c084fc;
+    text-transform: uppercase;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    cursor: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='28' height='28' viewBox='0 0 24 24' fill='%23c084fc'><path d='M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z'/></svg>") 14 14, pointer;
+    user-select: none;
+}
+
+.music-control:hover {
+    border-color: rgba(192, 132, 252, 0.35);
+    box-shadow: 0 8px 30px rgba(192, 132, 252, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.15);
+    transform: translateY(-2px);
+}
+
+.music-control:active {
+    transform: translateY(0);
+}
+
+.music-control.playing {
+    border-color: rgba(167, 139, 250, 0.4);
+    box-shadow: 0 0 25px rgba(167, 139, 250, 0.3);
+}
+
+.music-icon {
+    width: 26px;
+    height: 26px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    flex-shrink: 0;
+}
+
+.music-icon svg {
+    width: 20px;
+    height: 20px;
+    fill: #c084fc;
+    transition: all 0.3s ease;
+}
+
+.music-control.playing .music-icon svg {
+    fill: #a78bfa;
+}
+
+/* Animated equalizer bars when playing */
+.eq-bars {
+    display: none;
+    align-items: center;
+    gap: 2px;
+    height: 16px;
+}
+
+.music-control.playing .eq-bars {
+    display: flex;
+}
+
+.music-control.playing .music-label-play {
+    display: none;
+}
+
+.music-control:not(.playing) .music-label-pause {
+    display: none;
+}
+
+.eq-bar {
+    width: 2.5px;
+    background: linear-gradient(to top, #c084fc, #a78bfa);
+    border-radius: 2px;
+    animation: eqWave 0.8s ease-in-out infinite alternate;
+}
+
+.eq-bar:nth-child(1) { height: 8px; animation-delay: 0s; }
+.eq-bar:nth-child(2) { height: 12px; animation-delay: 0.15s; }
+.eq-bar:nth-child(3) { height: 6px; animation-delay: 0.3s; }
+.eq-bar:nth-child(4) { height: 14px; animation-delay: 0.1s; }
+.eq-bar:nth-child(5) { height: 9px; animation-delay: 0.25s; }
+
+@keyframes eqWave {
+    from {
+        transform: scaleY(0.5);
+        opacity: 0.6;
+    }
+    to {
+        transform: scaleY(1);
+        opacity: 1;
+    }
+}
+
+.instruction-card {
+    pointer-events: auto;
+    align-self: flex-start;
+    background: var(--glass-bg);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid var(--glass-border);
+    padding: 1.5rem 2rem;
+    border-radius: 20px;
+    max-width: 330px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+    animation: fadeInUp 1.2s ease-out;
+    margin-top: auto;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.instruction-card:hover {
+    border-color: rgba(192, 132, 252, 0.3);
+    box-shadow: 0 15px 35px rgba(192, 132, 252, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+    transform: translateY(-5px);
+}
+
+.instruction-card h3 {
+    font-size: 1.1rem;
+    font-weight: 600;
+    margin-bottom: 0.6rem;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.instruction-card h3::before {
+    content: '';
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    background-color: var(--lilac-medium);
+    border-radius: 50%;
+    box-shadow: 0 0 10px var(--lilac-medium);
+}
+
+.instruction-card p {
+    font-size: 0.88rem;
+    line-height: 1.5;
+    color: #d8b4fe;
+    font-weight: 300;
+}
+
+/* Interactive status alert */
+#status-indicator {
+    position: absolute;
+    top: 2.5rem;
+    right: 2.5rem;
+    pointer-events: auto;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: rgba(8, 12, 29, 0.6);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid var(--glass-border);
+    padding: 0.8rem 1.5rem;
+    border-radius: 50px;
+    font-size: 0.82rem;
+    font-weight: 500;
+    letter-spacing: 1px;
+    color: #fca5a5;
+    text-transform: uppercase;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    transition: all 0.5s ease;
+}
+
+#status-indicator.soothed {
+    border-color: rgba(167, 139, 250, 0.4);
+    box-shadow: 0 0 25px rgba(167, 139, 250, 0.3);
+    color: #c084fc;
+}
+
+.indicator-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background-color: #ef4444;
+    box-shadow: 0 0 8px #ef4444;
+    transition: all 0.5s ease;
+}
+
+#status-indicator.soothed .indicator-dot {
+    background-color: #a78bfa;
+    box-shadow: 0 0 12px #a78bfa;
+    animation: pulse 1s infinite alternate;
+}
+
+/* Animations */
+@keyframes fadeInDown {
+    from {
+        opacity: 0;
+        transform: translateY(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes pulse {
+    from {
+        transform: scale(0.9);
+        opacity: 0.6;
+    }
+    to {
+        transform: scale(1.3);
+        opacity: 1;
+    }
+}
+
+@media (max-width: 600px) {
+    .ui-container {
+        padding: 1.5rem;
+    }
+    h1 {
+        font-size: 1.8rem;
+    }
+    #status-indicator {
+        top: auto;
+        bottom: 1.5rem;
+        right: 1.5rem;
+    }
+    .music-control {
+        position: absolute;
+        top: auto;
+        bottom: 1.5rem;
+        right: auto;
+        left: 1.5rem;
+        padding: 0.45rem 0.9rem;
+        font-size: 0.65rem;
+    }
+    .music-control .eq-bars {
+        height: 12px;
+    }
+    .music-control .eq-bar {
+        width: 2px;
+    }
+    .instruction-card {
+        max-width: 100%;
+        margin-top: 0;
+        margin-bottom: 6rem;
+    }
+}

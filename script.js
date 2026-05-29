@@ -1,0 +1,1160 @@
+// --- Setup Scene, Camera, and Renderer ---
+const container = document.getElementById('canvas-container');
+const scene = new THREE.Scene();
+
+// Deep indigo night fog
+scene.fog = new THREE.FogExp2(0x080c1d, 0.035);
+
+const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+camera.position.set(0, 3, 15);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 0.95;
+container.appendChild(renderer.domElement);
+
+// --- Orbit Controls ---
+const controls = new THREE.OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.05;
+controls.maxPolarAngle = Math.PI / 2 + 0.05; // Lock camera just above horizon
+controls.minDistance = 6;
+controls.maxDistance = 22;
+controls.autoRotate = true;
+controls.autoRotateSpeed = 0.4; // Soft continuous orbit
+
+// --- Lights ---
+// Soft ambient deep night-blue fill
+const ambientLight = new THREE.AmbientLight(0x192742, 1.8);
+scene.add(ambientLight);
+
+// Moon directional light casting soft highlights and shadows
+const moonLight = new THREE.DirectionalLight(0xdbeafe, 1.8);
+moonLight.position.set(-15, 20, -10);
+moonLight.castShadow = true;
+moonLight.shadow.mapSize.width = 1024;
+moonLight.shadow.mapSize.height = 1024;
+moonLight.shadow.bias = -0.0005;
+scene.add(moonLight);
+
+// Soft pinkish secondary bounce light from wings/atmosphere
+const pinkFillLight = new THREE.DirectionalLight(0xffd1dc, 0.8);
+pinkFillLight.position.set(10, 5, 10);
+scene.add(pinkFillLight);
+
+// --- Color Scheme and Materials (Warm Brown Deer, Pink Wings, Lilac Accents) ---
+const colors = {
+    deerBody: 0x8a5b3a,      // Rich warm fawn brown
+    deerBelly: 0xfcf7f0,     // Soft cream-white
+    deerNose: 0x2e1910,      // Dark chocolate nose
+    antlers: 0xfcf7f0,       // Light cream antlers
+    wings: 0xffb7ce,         // Soft glowing pink wings
+    foreheadHeart: 0xcbb2e8, // Soft lilac heart
+    eyeTurquoise: 0x20d5c8,  // Slanted glowing turquoise eyes
+    eyeClosed: 0x4a2f1c,     // Dark closed eyelids
+    tear: 0x60a5fa,          // Glowing blue tear
+    ground: 0x07111e          // Indigo night floor
+};
+
+// Smooth shaded Standard Materials for a vinyl/clay look
+const deerMaterial = new THREE.MeshStandardMaterial({
+    color: colors.deerBody,
+    roughness: 0.5,
+    metalness: 0.05
+});
+
+const whiteMaterial = new THREE.MeshStandardMaterial({
+    color: colors.deerBelly,
+    roughness: 0.55
+});
+
+const noseMaterial = new THREE.MeshStandardMaterial({
+    color: colors.deerNose,
+    roughness: 0.8
+});
+
+const antlerMaterial = new THREE.MeshStandardMaterial({
+    color: colors.antlers,
+    roughness: 0.4
+});
+
+// Translucent, glowing pink wings
+const wingMaterial = new THREE.MeshStandardMaterial({
+    color: colors.wings,
+    emissive: 0xff99b9,
+    emissiveIntensity: 0.5,
+    transparent: true,
+    opacity: 0.82,
+    side: THREE.DoubleSide,
+    roughness: 0.1,
+    metalness: 0.1
+});
+
+// Lilac Forehead Heart material
+const heartMaterial = new THREE.MeshStandardMaterial({
+    color: colors.foreheadHeart,
+    emissive: 0xa78bfa,
+    emissiveIntensity: 0.4,
+    roughness: 0.3
+});
+
+// Slanted Turquoise Eyes
+const eyeMaterialNormal = new THREE.MeshStandardMaterial({
+    color: colors.eyeTurquoise,
+    emissive: 0x20d5c8,
+    emissiveIntensity: 0.6,
+    roughness: 0.2
+});
+
+// Closed Soothed Eyelids
+const eyeMaterialSoothed = new THREE.MeshBasicMaterial({
+    color: colors.eyeClosed
+});
+
+// Tear Material
+const tearMaterial = new THREE.MeshStandardMaterial({
+    color: colors.tear,
+    emissive: 0x3b82f6,
+    emissiveIntensity: 1.4,
+    transparent: true,
+    opacity: 0.9,
+    roughness: 0.1
+});
+
+// --- Build 3D Forest Environment ---
+
+// 1. Forest Floor (Ground Plane)
+const ground = new THREE.Mesh(
+    new THREE.PlaneGeometry(80, 80),
+    new THREE.MeshStandardMaterial({
+        color: colors.ground,
+        roughness: 0.95,
+        metalness: 0.05
+    })
+);
+ground.rotation.x = -Math.PI / 2;
+ground.position.y = -6.0;
+ground.receiveShadow = true;
+scene.add(ground);
+
+// 2. Procedural Trees and Bushes
+const forestGroup = new THREE.Group();
+scene.add(forestGroup);
+
+const leafMatPine = new THREE.MeshStandardMaterial({ color: 0x0a1e1b, roughness: 0.9, flatShading: true });
+const leafMatLeafy = new THREE.MeshStandardMaterial({ color: 0x092226, roughness: 0.85, flatShading: true });
+const leafMatBush = new THREE.MeshStandardMaterial({ color: 0x0c2920, roughness: 0.9, flatShading: true });
+const trunkMat = new THREE.MeshStandardMaterial({ color: 0x1a0f0a, roughness: 0.95 });
+
+// Helper to spawn a Low-Poly Pine Tree
+const spawnPineTree = (x, z) => {
+    const tree = new THREE.Group();
+    tree.position.set(x, -6.0, z);
+
+    const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.2, 1.4, 5), trunkMat);
+    trunk.position.y = 0.7;
+    trunk.castShadow = true;
+    tree.add(trunk);
+
+    const cone1 = new THREE.Mesh(new THREE.ConeGeometry(0.9, 1.8, 5), leafMatPine);
+    cone1.position.y = 2.0;
+    cone1.castShadow = true;
+    tree.add(cone1);
+
+    const cone2 = new THREE.Mesh(new THREE.ConeGeometry(0.7, 1.3, 5), leafMatPine);
+    cone2.position.y = 2.8;
+    cone2.castShadow = true;
+    tree.add(cone2);
+
+    const scale = 0.75 + Math.random() * 0.55;
+    tree.scale.set(scale, scale, scale);
+    forestGroup.add(tree);
+};
+
+// Helper to spawn a Round Leafy Tree
+const spawnLeafyTree = (x, z) => {
+    const tree = new THREE.Group();
+    tree.position.set(x, -6.0, z);
+
+    const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.24, 1.8, 5), trunkMat);
+    trunk.position.y = 0.9;
+    trunk.castShadow = true;
+    tree.add(trunk);
+
+    const foliage = new THREE.Mesh(new THREE.SphereGeometry(1.1, 5, 5), leafMatLeafy);
+    foliage.scale.set(1.0, 1.3, 1.0);
+    foliage.position.y = 2.3;
+    foliage.castShadow = true;
+    tree.add(foliage);
+
+    const scale = 0.75 + Math.random() * 0.55;
+    tree.scale.set(scale, scale, scale);
+    forestGroup.add(tree);
+};
+
+// Helper to spawn a Bush
+const spawnBush = (x, z) => {
+    const bush = new THREE.Group();
+    bush.position.set(x, -6.0, z);
+
+    const sphere1 = new THREE.Mesh(new THREE.SphereGeometry(0.5, 4, 4), leafMatBush);
+    sphere1.position.y = 0.35;
+    bush.add(sphere1);
+
+    const sphere2 = new THREE.Mesh(new THREE.SphereGeometry(0.38, 4, 4), leafMatBush);
+    sphere2.position.set(-0.35, 0.2, 0.15);
+    bush.add(sphere2);
+
+    const sphere3 = new THREE.Mesh(new THREE.SphereGeometry(0.38, 4, 4), leafMatBush);
+    sphere3.position.set(0.35, 0.2, -0.15);
+    bush.add(sphere3);
+
+    const scale = 0.8 + Math.random() * 0.45;
+    bush.scale.set(scale, scale, scale);
+    forestGroup.add(bush);
+};
+
+// Populate forest on ground, avoiding a center radius so we can see the falling tears easily
+for (let i = 0; i < 70; i++) {
+    const angle = Math.random() * Math.PI * 2;
+    // Distribute mostly outside the center to frame the deer's tears
+    const radius = 3.5 + Math.sqrt(Math.random()) * 22;
+    const x = Math.cos(angle) * radius;
+    const z = Math.sin(angle) * radius;
+
+    const roll = Math.random();
+    if (roll < 0.4) {
+        spawnPineTree(x, z);
+    } else if (roll < 0.75) {
+        spawnLeafyTree(x, z);
+    } else {
+        spawnBush(x, z);
+    }
+}
+
+// 3. Glowing Background Moon (At height of the deer)
+const moonGroup = new THREE.Group();
+moonGroup.position.set(-11, 4.5, -20);
+scene.add(moonGroup);
+
+const moonCore = new THREE.Mesh(
+    new THREE.SphereGeometry(2.5, 16, 16),
+    new THREE.MeshBasicMaterial({ color: 0xfffcf0 })
+);
+moonGroup.add(moonCore);
+
+// Soft halo glow
+const moonHalo = new THREE.Mesh(
+    new THREE.SphereGeometry(2.7, 16, 16),
+    new THREE.MeshBasicMaterial({
+        color: 0xe0f2fe,
+        transparent: true,
+        opacity: 0.12,
+        side: THREE.BackSide
+    })
+);
+moonGroup.add(moonHalo);
+
+// --- Sparking Stars System ---
+const starCount = 350;
+const starGeo = new THREE.BufferGeometry();
+const starPositions = new Float32Array(starCount * 3);
+const starSpeeds = new Float32Array(starCount);
+const starAngles = new Float32Array(starCount);
+
+for (let i = 0; i < starCount; i++) {
+    const r = 12 + Math.random() * 25;
+    const theta = Math.random() * Math.PI * 2;
+    const phi = Math.acos((Math.random() * 2) - 1);
+
+    starPositions[i * 3] = r * Math.sin(phi) * Math.cos(theta);
+    starPositions[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta) + 3; // Shift upwards
+    starPositions[i * 3 + 2] = r * Math.cos(phi);
+
+    starSpeeds[i] = 0.03 + Math.random() * 0.05;
+    starAngles[i] = Math.random() * Math.PI * 2;
+}
+
+starGeo.setAttribute('position', new THREE.BufferAttribute(starPositions, 3));
+
+const createStarTexture = () => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 16;
+    canvas.height = 16;
+    const ctx = canvas.getContext('2d');
+    const grad = ctx.createRadialGradient(8, 8, 0, 8, 8, 8);
+    grad.addColorStop(0, 'rgba(255, 255, 255, 1)');
+    grad.addColorStop(0.3, 'rgba(192, 132, 252, 0.8)'); // Lilac shimmer
+    grad.addColorStop(1, 'rgba(8, 12, 29, 0)');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, 16, 16);
+    return new THREE.CanvasTexture(canvas);
+};
+
+const starMaterial = new THREE.PointsMaterial({
+    size: 0.28,
+    map: createStarTexture(),
+    transparent: true,
+    opacity: 0.9,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false
+});
+
+const starParticles = new THREE.Points(starGeo, starMaterial);
+scene.add(starParticles);
+
+// --- Build 3D Deer (Brown, Smooth Shading) ---
+const deerGroup = new THREE.Group();
+scene.add(deerGroup);
+deerGroup.position.set(0, 1.8, 0); // Flying high near moon height
+
+const deerBodyGroup = new THREE.Group();
+deerGroup.add(deerBodyGroup);
+
+// 1. Body
+const bodyGeo = new THREE.ConeGeometry(1.15, 3.0, 12);
+bodyGeo.rotateX(Math.PI / 2); // Orient horizontally
+bodyGeo.scale(1.0, 1.0, 1.25);
+const body = new THREE.Mesh(bodyGeo, deerMaterial);
+body.castShadow = true;
+body.receiveShadow = true;
+deerBodyGroup.add(body);
+
+// Cream Chest/Belly
+const bellyGeo = new THREE.SphereGeometry(1.05, 12, 12);
+bellyGeo.scale(0.82, 0.72, 1.22);
+const belly = new THREE.Mesh(bellyGeo, whiteMaterial);
+belly.position.set(0, -0.3, 0.25);
+deerBodyGroup.add(belly);
+
+// Spots on the Back/Side
+const spotGeo = new THREE.SphereGeometry(0.08, 8, 8);
+spotGeo.scale(1.2, 0.15, 1.2); // Flat circular spots
+
+const spots = [
+    { pos: [0.35, 0.32, -0.3], rot: [0.15, 0, 0.6] },
+    { pos: [-0.35, 0.32, -0.3], rot: [0.15, 0, -0.6] },
+    { pos: [0.38, 0.12, -0.8], rot: [0.2, 0, 0.8] },
+    { pos: [-0.38, 0.12, -0.8], rot: [0.2, 0, -0.8] },
+    { pos: [0.22, 0.38, -1.1], rot: [0.1, 0, 0.4] },
+    { pos: [-0.22, 0.38, -1.1], rot: [0.1, 0, -0.4] }
+];
+
+spots.forEach(s => {
+    const spot = new THREE.Mesh(spotGeo, whiteMaterial);
+    spot.position.set(s.pos[0], s.pos[1], s.pos[2]);
+    spot.rotation.set(s.rot[0], s.rot[1], s.rot[2]);
+    deerBodyGroup.add(spot);
+});
+
+// 2. Neck
+const neckGeo = new THREE.CylinderGeometry(0.26, 0.42, 2.2, 12);
+neckGeo.rotateX(-Math.PI / 6); // Slant forward
+const neck = new THREE.Mesh(neckGeo, deerMaterial);
+neck.position.set(0, 1.15, 1.05);
+neck.castShadow = true;
+deerBodyGroup.add(neck);
+
+// Neck spots
+const neckSpots = [
+    { pos: [0.22, 1.55, 1.35], rot: [0.1, 0.2, 0.4] },
+    { pos: [-0.22, 1.25, 1.2], rot: [0.1, -0.2, -0.4] },
+    { pos: [0.2, 0.95, 1.05], rot: [0.1, 0.2, 0.3] }
+];
+neckSpots.forEach(s => {
+    const spot = new THREE.Mesh(spotGeo, whiteMaterial);
+    spot.position.set(s.pos[0], s.pos[1], s.pos[2]);
+    spot.rotation.set(s.rot[0], s.rot[1], s.rot[2]);
+    deerBodyGroup.add(spot);
+});
+
+// 3. Head Group
+const headGroup = new THREE.Group();
+headGroup.position.set(0, 2.22, 1.65);
+deerBodyGroup.add(headGroup);
+
+const headBaseGeo = new THREE.SphereGeometry(0.70, 12, 12);
+headBaseGeo.scale(0.9, 0.9, 1.22);
+const headBase = new THREE.Mesh(headBaseGeo, deerMaterial);
+headBase.castShadow = true;
+headGroup.add(headBase);
+
+// Two-tone snout
+const snoutGeo = new THREE.ConeGeometry(0.36, 1.1, 12);
+snoutGeo.rotateX(Math.PI / 2.2);
+const snout = new THREE.Mesh(snoutGeo, deerMaterial);
+snout.position.set(0, -0.05, 0.68);
+snout.castShadow = true;
+headGroup.add(snout);
+
+const jawGeo = new THREE.ConeGeometry(0.32, 1.0, 12);
+jawGeo.rotateX(Math.PI / 2.3);
+const jaw = new THREE.Mesh(jawGeo, whiteMaterial);
+jaw.position.set(0, -0.24, 0.6);
+headGroup.add(jaw);
+
+// Nose tip
+const noseGeo = new THREE.SphereGeometry(0.13, 8, 8);
+const nose = new THREE.Mesh(noseGeo, noseMaterial);
+nose.position.set(0, -0.15, 1.18);
+headGroup.add(nose);
+
+// Lilac Forehead Heart
+const heartShape = new THREE.Shape();
+const x = 0, y = 0;
+heartShape.moveTo( x + 0.25, y + 0.25 );
+heartShape.bezierCurveTo( x + 0.25, y + 0.25, x + 0.2, y + 0.5, x, y + 0.5 );
+heartShape.bezierCurveTo( x - 0.3, y + 0.5, x - 0.3, y + 0.15, x - 0.3, y + 0.15 );
+heartShape.bezierCurveTo( x - 0.3, y - 0.15, x - 0.1, y - 0.35, x, y - 0.5 );
+heartShape.bezierCurveTo( x + 0.1, y - 0.35, x + 0.3, y - 0.15, x + 0.3, y + 0.15 );
+heartShape.bezierCurveTo( x + 0.3, y + 0.15, x + 0.3, y + 0.5, x + 0.25, y + 0.25 );
+
+const heartGeo = new THREE.ExtrudeGeometry(heartShape, {
+    depth: 0.05,
+    bevelEnabled: true,
+    bevelSegments: 2,
+    steps: 1,
+    bevelSize: 0.02,
+    bevelThickness: 0.02
+});
+heartGeo.rotateZ(Math.PI); // Orient heart correctly (point down)
+heartGeo.scale(0.5, 0.5, 0.5);
+
+const heartMesh = new THREE.Mesh(heartGeo, heartMaterial);
+// Positioned on the forehead
+heartMesh.position.set(0, 0.38, 0.65);
+heartMesh.rotation.set(-Math.PI / 6, 0, 0);
+headGroup.add(heartMesh);
+
+// Large rounded ears
+const earLeftOuterGeo = new THREE.SphereGeometry(0.40, 12, 12);
+earLeftOuterGeo.scale(0.85, 1.6, 0.28);
+const earLeft = new THREE.Mesh(earLeftOuterGeo, deerMaterial);
+earLeft.position.set(-0.52, 0.66, -0.08);
+earLeft.rotation.set(-Math.PI / 10, Math.PI / 4, -Math.PI / 3.8);
+earLeft.castShadow = true;
+headGroup.add(earLeft);
+
+const earLeftInnerGeo = new THREE.SphereGeometry(0.33, 10, 10);
+earLeftInnerGeo.scale(0.75, 1.4, 0.12);
+const earLeftInner = new THREE.Mesh(earLeftInnerGeo, whiteMaterial);
+earLeftInner.position.set(-0.50, 0.68, -0.05);
+earLeftInner.rotation.set(-Math.PI / 10, Math.PI / 4, -Math.PI / 3.8);
+headGroup.add(earLeftInner);
+
+const earRightOuterGeo = new THREE.SphereGeometry(0.40, 12, 12);
+earRightOuterGeo.scale(0.85, 1.6, 0.28);
+const earRight = new THREE.Mesh(earRightOuterGeo, deerMaterial);
+earRight.position.set(0.52, 0.66, -0.08);
+earRight.rotation.set(-Math.PI / 10, -Math.PI / 4, Math.PI / 3.8);
+earRight.castShadow = true;
+headGroup.add(earRight);
+
+const earRightInnerGeo = new THREE.SphereGeometry(0.33, 10, 10);
+earRightInnerGeo.scale(0.75, 1.4, 0.12);
+const earRightInner = new THREE.Mesh(earRightInnerGeo, whiteMaterial);
+earRightInner.position.set(0.50, 0.68, -0.05);
+earRightInner.rotation.set(-Math.PI / 10, -Math.PI / 4, Math.PI / 3.8);
+headGroup.add(earRightInner);
+
+// Antlers
+const createAntlerBranch = (group, startPos, scale, rotX, rotZ) => {
+    const branch = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.08, 1.1, 8), antlerMaterial);
+    branch.position.copy(startPos);
+    branch.rotation.set(rotX, 0, rotZ);
+    branch.scale.set(scale, scale, scale);
+    branch.castShadow = true;
+    group.add(branch);
+    return branch;
+};
+
+const antlersGroupLeft = new THREE.Group();
+antlersGroupLeft.position.set(-0.35, 0.58, 0.08);
+headGroup.add(antlersGroupLeft);
+createAntlerBranch(antlersGroupLeft, new THREE.Vector3(0, 0.5, 0), 1.0, 0.2, -0.4);
+createAntlerBranch(antlersGroupLeft, new THREE.Vector3(-0.3, 0.9, 0.1), 0.7, 0.5, -0.8);
+createAntlerBranch(antlersGroupLeft, new THREE.Vector3(0.1, 1.2, 0.1), 0.6, -0.3, 0.2);
+
+const antlersGroupRight = new THREE.Group();
+antlersGroupRight.position.set(0.35, 0.58, 0.08);
+headGroup.add(antlersGroupRight);
+createAntlerBranch(antlersGroupRight, new THREE.Vector3(0, 0.5, 0), 1.0, 0.2, 0.4);
+createAntlerBranch(antlersGroupRight, new THREE.Vector3(0.3, 0.9, 0.1), 0.7, 0.5, 0.8);
+createAntlerBranch(antlersGroupRight, new THREE.Vector3(-0.1, 1.2, 0.1), 0.6, -0.3, -0.2);
+
+// 4. White Eye Patches and Slanted Turquoise Eyes
+const eyePatchGeo = new THREE.SphereGeometry(0.24, 10, 10);
+eyePatchGeo.scale(1.45, 1.05, 0.18);
+
+const eyePatchLeft = new THREE.Mesh(eyePatchGeo, whiteMaterial);
+eyePatchLeft.position.set(-0.34, 0.12, 0.57);
+eyePatchLeft.rotation.set(0, -Math.PI / 6, -Math.PI / 12);
+
+const eyePatchRight = new THREE.Mesh(eyePatchGeo, whiteMaterial);
+eyePatchRight.position.set(0.34, 0.12, 0.57);
+eyePatchRight.rotation.set(0, Math.PI / 6, Math.PI / 12);
+
+headGroup.add(eyePatchLeft, eyePatchRight);
+
+// Left Eye - Turquoise Slanted (Achinado)
+const eyeLeftNormal = new THREE.Mesh(new THREE.SphereGeometry(0.11, 8, 8), eyeMaterialNormal);
+eyeLeftNormal.scale.set(1.4, 0.5, 0.35); // Slanted slit shape
+eyeLeftNormal.position.set(-0.36, 0.12, 0.60);
+eyeLeftNormal.rotation.set(0, -Math.PI / 6, -Math.PI / 12);
+headGroup.add(eyeLeftNormal);
+
+// Right Eye - Turquoise Slanted
+const eyeRightNormal = new THREE.Mesh(new THREE.SphereGeometry(0.11, 8, 8), eyeMaterialNormal);
+eyeRightNormal.scale.set(1.4, 0.5, 0.35);
+eyeRightNormal.position.set(0.36, 0.12, 0.60);
+eyeRightNormal.rotation.set(0, Math.PI / 6, Math.PI / 12);
+headGroup.add(eyeRightNormal);
+
+// Closed Soothed Eyes (happy arch ^ ^)
+const happyEyeShape = new THREE.TorusGeometry(0.08, 0.024, 4, 8, Math.PI); // Half arch pointing up
+
+const eyeLeftSoothed = new THREE.Mesh(happyEyeShape, eyeMaterialSoothed);
+eyeLeftSoothed.position.set(-0.36, 0.08, 0.60);
+eyeLeftSoothed.rotation.set(0, -Math.PI / 6, -Math.PI / 12);
+eyeLeftSoothed.visible = false;
+headGroup.add(eyeLeftSoothed);
+
+const eyeRightSoothed = new THREE.Mesh(happyEyeShape, eyeMaterialSoothed);
+eyeRightSoothed.position.set(0.36, 0.08, 0.60);
+eyeRightSoothed.rotation.set(0, Math.PI / 6, Math.PI / 12);
+eyeRightSoothed.visible = false;
+headGroup.add(eyeRightSoothed);
+
+// 5. Slender Legs
+const legGroupFL = new THREE.Group();
+const legGroupFR = new THREE.Group();
+const legGroupBL = new THREE.Group();
+const legGroupBR = new THREE.Group();
+
+legGroupFL.position.set(-0.46, -0.75, 0.95);
+legGroupFR.position.set(0.46, -0.75, 0.95);
+legGroupBL.position.set(-0.36, -0.85, -1.1);
+legGroupBR.position.set(0.36, -0.85, -1.1);
+
+deerBodyGroup.add(legGroupFL, legGroupFR, legGroupBL, legGroupBR);
+
+const makeLeg = (group) => {
+    const upper = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.1, 1.2, 8), deerMaterial);
+    upper.position.y = -0.5;
+    upper.castShadow = true;
+    group.add(upper);
+
+    const joint = new THREE.Group();
+    joint.position.y = -1.1;
+    group.add(joint);
+
+    const lower = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.05, 1.1, 8), whiteMaterial);
+    lower.position.y = -0.5;
+    lower.castShadow = true;
+    joint.add(lower);
+
+    return { upper, joint };
+};
+
+const legFL = makeLeg(legGroupFL);
+const legFR = makeLeg(legGroupFR);
+const legBL = makeLeg(legGroupBL);
+const legBR = makeLeg(legGroupBR);
+
+// Tail
+const tailGeo = new THREE.ConeGeometry(0.18, 0.75, 8);
+tailGeo.rotateX(-Math.PI / 3);
+const tail = new THREE.Mesh(tailGeo, deerMaterial);
+tail.position.set(0, 0.4, -1.6);
+deerBodyGroup.add(tail);
+
+// 6. Pink Fairy Wings (Semi-transparent, beautiful shape)
+const leftWingsGroup = new THREE.Group();
+const rightWingsGroup = new THREE.Group();
+
+leftWingsGroup.position.set(-0.45, 0.55, -0.15);
+rightWingsGroup.position.set(0.45, 0.55, -0.15);
+
+deerBodyGroup.add(leftWingsGroup, rightWingsGroup);
+
+// Left wing shape
+const wingShapeL = new THREE.Shape();
+wingShapeL.moveTo(0, 0);
+wingShapeL.bezierCurveTo(-1.3, 2.3, -2.2, 1.4, -2.7, 0.4);
+wingShapeL.bezierCurveTo(-2.9, -0.2, -2.0, -0.7, -1.1, -0.25);
+wingShapeL.bezierCurveTo(-1.8, -1.6, -1.4, -2.1, -0.7, -1.8);
+wingShapeL.bezierCurveTo(-0.15, -1.4, -0.15, -0.5, 0, 0);
+
+const leftWingGeo = new THREE.ShapeGeometry(wingShapeL);
+const leftWing = new THREE.Mesh(leftWingGeo, wingMaterial);
+leftWing.castShadow = true;
+leftWingsGroup.add(leftWing);
+
+// Right wing shape
+const wingShapeR = new THREE.Shape();
+wingShapeR.moveTo(0, 0);
+wingShapeR.bezierCurveTo(1.3, 2.3, 2.2, 1.4, 2.7, 0.4);
+wingShapeR.bezierCurveTo(2.9, -0.2, 2.0, -0.7, 1.1, -0.25);
+wingShapeR.bezierCurveTo(1.8, -1.6, 1.4, -2.1, 0.7, -1.8);
+wingShapeR.bezierCurveTo(0.15, -1.4, 0.15, -0.5, 0, 0);
+
+const rightWingGeo = new THREE.ShapeGeometry(wingShapeR);
+const rightWing = new THREE.Mesh(rightWingGeo, wingMaterial);
+rightWing.castShadow = true;
+rightWingsGroup.add(rightWing);
+
+// Secondary backing wings
+const leftBackWing = leftWing.clone();
+leftBackWing.scale.set(0.65, 0.65, 0.65);
+leftBackWing.rotation.set(0, -0.2, -0.35);
+leftBackWing.position.set(-0.08, -0.25, -0.08);
+leftWingsGroup.add(leftBackWing);
+
+const rightBackWing = rightWing.clone();
+rightBackWing.scale.set(0.65, 0.65, 0.65);
+rightBackWing.rotation.set(0, 0.2, 0.35);
+rightBackWing.position.set(0.08, -0.25, -0.08);
+rightWingsGroup.add(rightBackWing);
+
+// Build list of interactive meshes
+const interactiveMeshes = [];
+deerBodyGroup.traverse((child) => {
+    if (child.isMesh) {
+        interactiveMeshes.push(child);
+    }
+});
+
+// --- Crying Mechanics & Tears (Default: TRUE) ---
+let isCrying = true;
+const statusIndicator = document.getElementById('status-indicator');
+const statusText = document.getElementById('status-text');
+
+const tearParticles = [];
+const tearGroup = new THREE.Group();
+scene.add(tearGroup);
+
+const spawnTear = () => {
+    const leftEyeWorld = new THREE.Vector3();
+    eyeLeftNormal.getWorldPosition(leftEyeWorld);
+
+    const rightEyeWorld = new THREE.Vector3();
+    eyeRightNormal.getWorldPosition(rightEyeWorld);
+
+    const buildTear = (startPos) => {
+        const tearGeo = new THREE.ConeGeometry(0.07, 0.2, 5);
+        tearGeo.rotateX(Math.PI);
+        const tear = new THREE.Mesh(tearGeo, tearMaterial);
+
+        tear.position.copy(startPos);
+        tear.position.x += (Math.random() - 0.5) * 0.08;
+        tear.position.y -= 0.08;
+        tear.position.z += 0.04;
+
+        const p = {
+            mesh: tear,
+            velY: -0.04 - Math.random() * 0.03,
+            velX: (Math.random() - 0.5) * 0.015,
+            velZ: 0.01 + Math.random() * 0.015,
+            life: 1.0,
+            decay: 0.008 + Math.random() * 0.008 // Slower decay so tears reach the ground
+        };
+
+        tearGroup.add(tear);
+        tearParticles.push(p);
+    };
+
+    buildTear(leftEyeWorld);
+    buildTear(rightEyeWorld);
+};
+
+// --- Flower Spawning and Growth (From Tears Hitting Ground) ---
+const activeFlowers = [];
+const flowersGroup = new THREE.Group();
+scene.add(flowersGroup);
+
+// Colors for growing flowers
+const flowerColors = [0xf472b6, 0xd8b4fe, 0x93c5fd, 0xc084fc, 0xfca5a5, 0xa78bfa];
+
+const spawnFlower = (x, z) => {
+    // Stop if too far out of camera view bounds
+    if (Math.abs(x) > 28 || Math.abs(z) > 28) return;
+
+    const flower = new THREE.Group();
+    flower.position.set(x, -6.0, z);
+    flower.scale.set(0.01, 0.01, 0.01); // Start miniature
+
+    // Stem
+    const stemMat = new THREE.MeshStandardMaterial({ color: 0x0f4229, roughness: 0.9 });
+    const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.45, 4), stemMat);
+    stem.position.y = 0.22;
+    stem.castShadow = true;
+    flower.add(stem);
+
+    // Petals Material
+    const color = flowerColors[Math.floor(Math.random() * flowerColors.length)];
+    const petalMat = new THREE.MeshStandardMaterial({
+        color: color,
+        emissive: color,
+        emissiveIntensity: 0.45,
+        roughness: 0.6,
+        flatShading: true
+    });
+
+    // Center bulb
+    const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.1, 5, 5), petalMat);
+    bulb.position.y = 0.42;
+    bulb.castShadow = true;
+    flower.add(bulb);
+
+    // Petals shape
+    const petals = new THREE.Mesh(new THREE.ConeGeometry(0.2, 0.1, 5), petalMat);
+    petals.position.y = 0.42;
+    petals.rotation.x = Math.PI; // Inverted pointing petals
+    petals.castShadow = true;
+    flower.add(petals);
+
+    flowersGroup.add(flower);
+
+    activeFlowers.push({
+        mesh: flower,
+        scale: 0.01,
+        targetScale: 0.65 + Math.random() * 0.45,
+        age: 0,
+        lifespan: 11 + Math.random() * 6, // Flower lives for 11-17s
+        swayOffset: Math.random() * Math.PI * 2
+    });
+};
+
+const updateTears = () => {
+    for (let i = tearParticles.length - 1; i >= 0; i--) {
+        const p = tearParticles[i];
+        p.mesh.position.y += p.velY;
+        p.mesh.position.x += p.velX;
+        p.mesh.position.z += p.velZ;
+
+        // Simple gravity
+        p.velY -= 0.0035;
+
+        // Lifetime scaling
+        p.life -= p.decay;
+        p.mesh.scale.set(p.life, p.life, p.life);
+
+        // Collision with forest ground (y = -6.0)
+        if (p.mesh.position.y <= -6.0) {
+            spawnFlower(p.mesh.position.x, p.mesh.position.z);
+
+            // Remove
+            tearGroup.remove(p.mesh);
+            p.mesh.geometry.dispose();
+            tearParticles.splice(i, 1);
+            continue;
+        }
+
+        // Clean up dead particles
+        if (p.life <= 0) {
+            tearGroup.remove(p.mesh);
+            p.mesh.geometry.dispose();
+            tearParticles.splice(i, 1);
+        }
+    }
+};
+
+const updateFlowers = (time, delta) => {
+    for (let i = activeFlowers.length - 1; i >= 0; i--) {
+        const f = activeFlowers[i];
+        f.age += delta;
+
+        // Grow
+        if (f.scale < f.targetScale) {
+            f.scale += (f.targetScale - f.scale) * 0.08;
+            f.mesh.scale.set(f.scale, f.scale, f.scale);
+        }
+
+        // Swaying animation
+        f.mesh.rotation.z = Math.sin(time * 2.2 + f.swayOffset) * 0.07;
+        f.mesh.rotation.x = Math.cos(time * 1.6 + f.swayOffset) * 0.04;
+
+        // Scale down before death (last 2 seconds)
+        if (f.age > f.lifespan - 2) {
+            f.scale += (0 - f.scale) * 0.08;
+            f.mesh.scale.set(f.scale, f.scale, f.scale);
+        }
+
+        // Destroy
+        if (f.age >= f.lifespan) {
+            flowersGroup.remove(f.mesh);
+            f.mesh.traverse(child => {
+                if (child.isMesh) {
+                    child.geometry.dispose();
+                }
+            });
+            activeFlowers.splice(i, 1);
+        }
+    }
+};
+
+// --- Original Ambient Piano Music Engine (Web Audio API) ---
+// Genera una melodía original de piano en Do# menor, sin derechos de autor
+const musicEngine = {
+    ctx: null,
+    masterGain: null,
+    isPlaying: false,
+    isStarted: false,
+    scheduleTimer: null,
+    nextNoteTime: 0,
+    currentNote: 0,
+
+    // Secuencia arpegiada en Do# menor (MIDI): C#m - G#m7 - A - E - F#m - D#dim - G#7 - C#m
+    sequence: [
+        49, 56, 64, 56, 61, 56, 64, 56,
+        56, 63, 66, 63, 68, 63, 66, 63,
+        57, 64, 69, 64, 73, 64, 69, 64,
+        52, 59, 68, 59, 64, 59, 68, 59,
+        54, 57, 61, 57, 66, 57, 61, 57,
+        51, 54, 57, 54, 63, 54, 57, 54,
+        56, 61, 63, 61, 68, 61, 63, 61,
+        49, 56, 64, 56, 61, 56, 64, 56,
+    ],
+
+    noteDuration: 0.58,
+
+    init() {
+        if (this.ctx) return;
+        this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+        this.ctx.resume();
+
+        this.masterGain = this.ctx.createGain();
+        this.masterGain.gain.value = 0;
+        this.masterGain.connect(this.ctx.destination);
+
+        // Delay / eco atmosférico
+        const delay = this.ctx.createDelay(3.0);
+        delay.delayTime.value = 1.8;
+        const delayGain = this.ctx.createGain();
+        delayGain.gain.value = 0.15;
+        this.masterGain.connect(delay);
+        delay.connect(delayGain);
+        delayGain.connect(this.ctx.destination);
+        delayGain.connect(delay);
+    },
+
+    start() {
+        this.init();
+        if (this.isPlaying) return;
+        this.isPlaying = true;
+        this.isStarted = true;
+
+        const now = this.ctx.currentTime;
+        this.nextNoteTime = now + 0.1;
+        this.currentNote = 0;
+
+        this.masterGain.gain.setValueAtTime(0, now);
+        this.masterGain.gain.linearRampToValueAtTime(0.3, now + 2);
+
+        this.schedule();
+    },
+
+    stop() {
+        this.isPlaying = false;
+        if (this.scheduleTimer) {
+            clearTimeout(this.scheduleTimer);
+            this.scheduleTimer = null;
+        }
+        if (this.ctx) {
+            this.masterGain.gain.linearRampToValueAtTime(0, this.ctx.currentTime + 0.5);
+        }
+    },
+
+    schedule() {
+        if (!this.isPlaying) return;
+
+        const now = this.ctx.currentTime;
+        while (this.nextNoteTime < now + 0.3) {
+            this.playNote(this.nextNoteTime);
+            this.currentNote = (this.currentNote + 1) % this.sequence.length;
+            this.nextNoteTime += this.noteDuration;
+        }
+
+        this.scheduleTimer = setTimeout(() => this.schedule(), 50);
+    },
+
+    playNote(time) {
+        const midi = this.sequence[this.currentNote];
+        const freq = 440 * Math.pow(2, (midi - 69) / 12);
+        const dur = this.noteDuration * 0.92;
+
+        // Oscilador principal — onda triangular para sonido a piano
+        const osc = this.ctx.createOscillator();
+        osc.type = 'triangle';
+        osc.frequency.value = freq;
+
+        const gain = this.ctx.createGain();
+        gain.gain.setValueAtTime(0, time);
+        gain.gain.linearRampToValueAtTime(0.18, time + 0.015);
+        gain.gain.exponentialRampToValueAtTime(0.05, time + 0.2);
+        gain.gain.setValueAtTime(0.05, time + dur * 0.6);
+        gain.gain.exponentialRampToValueAtTime(0.001, time + dur);
+
+        osc.connect(gain);
+        gain.connect(this.masterGain);
+        osc.start(time);
+        osc.stop(time + dur);
+
+        // Armónico suave (quinta) para calidez
+        const osc2 = this.ctx.createOscillator();
+        osc2.type = 'sine';
+        osc2.frequency.value = freq * 1.5;
+
+        const gain2 = this.ctx.createGain();
+        gain2.gain.setValueAtTime(0, time);
+        gain2.gain.linearRampToValueAtTime(0.03, time + 0.02);
+        gain2.gain.exponentialRampToValueAtTime(0.005, time + 0.35);
+        gain2.gain.setValueAtTime(0.005, time + dur * 0.5);
+        gain2.gain.exponentialRampToValueAtTime(0.001, time + dur);
+
+        osc2.connect(gain2);
+        gain2.connect(this.masterGain);
+        osc2.start(time);
+        osc2.stop(time + dur);
+    },
+
+    destroy() {
+        this.stop();
+        if (this.ctx) {
+            this.ctx.close();
+            this.ctx = null;
+        }
+    }
+};
+
+// --- Control de Música (Play / Pause) ---
+const musicControl = document.getElementById('musicControl');
+
+const toggleMusic = () => {
+    if (musicEngine.isPlaying) {
+        musicEngine.stop();
+        musicControl.classList.remove('playing');
+        musicControl.title = 'Reproducir Música';
+    } else {
+        musicEngine.start();
+        musicControl.classList.add('playing');
+        musicControl.title = 'Pausar Música';
+    }
+};
+
+musicControl.addEventListener('click', toggleMusic);
+
+// Reproducir automáticamente al primer click en la página
+const startOnInteraction = () => {
+    if (!musicEngine.isStarted) {
+        musicEngine.start();
+        musicControl.classList.add('playing');
+        musicControl.title = 'Pausar Música';
+    }
+};
+
+document.addEventListener('click', startOnInteraction, { once: true });
+document.addEventListener('keydown', startOnInteraction, { once: true });
+document.addEventListener('touchstart', startOnInteraction, { once: true });
+
+// --- Mouse and Raycasting Interaction ---
+const raycaster = new THREE.Raycaster();
+const mouse = new THREE.Vector2();
+
+// Mouse move tracks coordinates
+window.addEventListener('mousemove', (e) => {
+    mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+    mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+});
+
+// Touch support for mobile
+window.addEventListener('touchmove', (e) => {
+    if (e.touches.length > 0) {
+        mouse.x = (e.touches[0].clientX / window.innerWidth) * 2 - 1;
+        mouse.y = -(e.touches[0].clientY / window.innerHeight) * 2 + 1;
+    }
+}, { passive: true });
+
+const checkInteraction = () => {
+    raycaster.setFromCamera(mouse, camera);
+    const intersects = raycaster.intersectObjects(interactiveMeshes);
+
+    if (intersects.length > 0) {
+        if (isCrying) {
+            isCrying = false;
+            // Trigger Soothed state (Happy eyes, stops tears)
+            eyeLeftNormal.visible = false;
+            eyeRightNormal.visible = false;
+            eyeLeftSoothed.visible = true;
+            eyeRightSoothed.visible = true;
+
+            statusIndicator.classList.add('soothed');
+            statusText.textContent = "Consolado y en Paz";
+        }
+    } else {
+        if (!isCrying) {
+            isCrying = true;
+            // Restore Crying state (Turquoise eyes, starts tears)
+            eyeLeftNormal.visible = true;
+            eyeRightNormal.visible = true;
+            eyeLeftSoothed.visible = false;
+            eyeRightSoothed.visible = false;
+
+            statusIndicator.classList.remove('soothed');
+            statusText.textContent = "Llorando en la Noche";
+        }
+    }
+};
+
+// --- Window Resize ---
+window.addEventListener('resize', () => {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+// --- Keyboard Controls for Deer Movement ---
+const keys = { w: false, a: false, s: false, d: false };
+window.addEventListener('keydown', (e) => {
+    const key = e.key.toLowerCase();
+    if (key === 'w' || key === 'a' || key === 's' || key === 'd') {
+        keys[key] = true;
+    }
+});
+window.addEventListener('keyup', (e) => {
+    const key = e.key.toLowerCase();
+    if (key === 'w' || key === 'a' || key === 's' || key === 'd') {
+        keys[key] = false;
+    }
+});
+
+const moveDirection = new THREE.Vector3();
+const camForward = new THREE.Vector3();
+const camRight = new THREE.Vector3();
+
+// --- Animation Loop ---
+const clock = new THREE.Clock();
+
+const animate = () => {
+    requestAnimationFrame(animate);
+
+    const time = clock.getElapsedTime();
+    const delta = clock.getDelta();
+
+    // Camera-relative WASD movement
+    moveDirection.set(0, 0, 0);
+
+    camera.getWorldDirection(camForward);
+    camForward.y = 0;
+    camForward.normalize();
+
+    camRight.crossVectors(camForward, camera.up);
+    camRight.y = 0;
+    camRight.normalize();
+
+    if (keys.w) moveDirection.add(camForward);
+    if (keys.s) moveDirection.sub(camForward);
+    if (keys.d) moveDirection.add(camRight);
+    if (keys.a) moveDirection.sub(camRight);
+
+    if (moveDirection.lengthSq() > 0) {
+        moveDirection.normalize();
+
+        const speed = 0.08;
+        deerGroup.position.addScaledVector(moveDirection, speed);
+
+        // Boundaries clamp to stay in forest
+        const limit = 28;
+        deerGroup.position.x = Math.max(-limit, Math.min(limit, deerGroup.position.x));
+        deerGroup.position.z = Math.max(-limit, Math.min(limit, deerGroup.position.z));
+
+        // Smoothly rotate the deer body to face flight direction
+        const targetAngle = Math.atan2(moveDirection.x, moveDirection.z);
+        let angleDiff = targetAngle - deerBodyGroup.rotation.y;
+        angleDiff = Math.atan2(Math.sin(angleDiff), Math.cos(angleDiff));
+        deerBodyGroup.rotation.y += angleDiff * 0.1;
+    }
+
+    // Make camera target follow the deer's world position smoothly
+    controls.target.copy(deerGroup.position);
+
+    // 1. Shivering and Crying States
+    let shiverX = 0;
+    let shiverY = 0;
+    if (isCrying) {
+        // Subtle high-frequency shiver because it is crying
+        shiverX = Math.sin(time * 60) * 0.035;
+        shiverY = Math.cos(time * 50) * 0.015;
+
+        // Spawn tears
+        if (Math.floor(time * 30) % 3 === 0) {
+            spawnTear();
+        }
+    }
+
+    // Update tears physics and ground collisions
+    updateTears();
+    // Update flower scales and wind sways
+    updateFlowers(time, delta);
+
+    // 2. Flying cycle (smooth bobbing)
+    const bobbing = Math.sin(time * 2.2) * 0.22;
+    deerBodyGroup.position.y = bobbing + shiverY;
+    deerBodyGroup.position.x = shiverX;
+    // Flying tilt
+    deerBodyGroup.rotation.z = Math.sin(time * 2.2) * 0.02 - 0.03;
+
+    // 3. Wing Flapping (Flaps faster when crying, calmer when soothed)
+    const flapSpeed = isCrying ? 7.0 : 4.0;
+    const wingFlap = Math.sin(time * flapSpeed) * 0.42;
+    leftWingsGroup.rotation.y = wingFlap;
+    rightWingsGroup.rotation.y = -wingFlap;
+
+    // Flex wings angles
+    leftWingsGroup.rotation.z = -0.15 - Math.abs(wingFlap) * 0.12;
+    rightWingsGroup.rotation.z = 0.15 + Math.abs(wingFlap) * 0.12;
+
+    // 4. Running Leg cycles
+    const legSpeed = 2.4;
+    const swingFL = Math.sin(time * legSpeed) * 0.35;
+    const swingBL = Math.cos(time * legSpeed) * 0.35;
+
+    legGroupFL.rotation.x = swingFL + 0.15;
+    legGroupFR.rotation.x = -swingFL + 0.15;
+    legGroupBL.rotation.x = swingBL - 0.1;
+    legGroupBR.rotation.x = -swingBL - 0.1;
+
+    legFL.joint.rotation.x = Math.max(0, -swingFL * 0.55);
+    legFR.joint.rotation.x = Math.max(0, swingFL * 0.55);
+    legBL.joint.rotation.x = Math.max(0, -swingBL * 0.35);
+    legBR.joint.rotation.x = Math.max(0, swingBL * 0.35);
+
+    // Head and Tail cycles
+    tail.rotation.z = Math.sin(time * 6) * 0.12;
+    headGroup.rotation.x = Math.sin(time * 2.2) * 0.04;
+
+    // 5. Stars Shimmer
+    const starPos = starGeo.attributes.position.array;
+    for (let i = 0; i < starCount; i++) {
+        starAngles[i] += starSpeeds[i];
+        starPos[i * 3 + 1] += Math.sin(starAngles[i]) * 0.0015;
+    }
+    starGeo.attributes.position.needsUpdate = true;
+
+    // 6. Moon slow drift/wobble
+    moonGroup.position.y = 4.5 + Math.sin(time * 0.4) * 0.1;
+
+    // 7. Raycast Interaction Checks
+    checkInteraction();
+
+    // 8. Render Scene
+    controls.update();
+    renderer.render(scene, camera);
+};
+
+// Initialize anim loop once DOM loaded
+animate();
